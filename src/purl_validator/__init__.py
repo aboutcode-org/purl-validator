@@ -56,7 +56,7 @@ def create_purl_map_entry(purl):
 
 def create_purl_map(purls):
     # Ensure elements of `purls` are PackageURLs:
-    purls = [check_purl(purl) for purl in purls]
+    purls = (check_purl(purl) for purl in purls)
 
     # purl map entries must be unique, sorted, and converted to bytes before going into the Map
     purl_map_entries = set(create_purl_map_entry(purl) for purl in purls)
@@ -71,28 +71,11 @@ def create_purl_map(purls):
 
 
 class PurlValidator:
-    def __init__(self, purls=None):
-        self.created_maps = []
-
-        if purls:
-            # Create purl map from list of purls
-            purl_map_loc = self.create_purl_map(purls=purls)
-        else:
-            purl_map_loc = PURL_MAP_LOCATION
-
-        self.purl_map = self.load_purl_map(location=purl_map_loc)
-
-    def __del__(self):
-        for loc in self.created_maps:
-            fileutils.delete(loc.parent)
-
-    def create_purl_map(self, purls):
-        purl_map_loc = create_purl_map(purls)
-        self.created_maps.append(purl_map_loc)
-        return purl_map_loc
+    def __init__(self, purl_map_loc=PURL_MAP_LOCATION):
+        self.purl_map = self.load_map(location=purl_map_loc)
 
     @classmethod
-    def load_purl_map(cls, location):
+    def load_map(cls, location):
         with open(location, "rb") as f:
             mm = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
         m = ducer.Map(mm)
