@@ -26,50 +26,59 @@ from packageurl import PackageURL
 import ducer
 
 
-PURLS = """
-pkg:maven/be.sweetmustard.vinegar/vinegar-pattern-matcher@0.1.1
-pkg:maven/be.sweetmustard.vinegar/vinegar-pattern-matcher@0.1.1?classifier=sources
-pkg:maven/be.sweetmustard.vinegar/vinegar-pattern-matcher@0.1.0
-pkg:maven/be.sweetmustard.vinegar/vinegar-pattern-matcher@0.1.0?classifier=sources
-""".split()
+PURL_MAP_LOCATION = Path(__file__).parent / "purls.map"
+
+
+def check_purl(purl):
+    if not isinstance(purl, (PackageURL, str)):
+        raise ValueError(f"invalid `purl`: {purl}")
+
+    # Ensure `purl` is a PackageURL
+    if isinstance(purl, str):
+        p = PackageURL.from_string(purl)
+    else:
+        p = purl
+
+    return p
+
+
+def create_purl_map_entry(purl):
+    p = check_purl(purl)
+
+    # Convert purl to bytes
+    if p.namespace:
+        purl_str = f"{p.type}/{p.namespace}/{p.name}"
+    else:
+        purl_str = f"{p.type}/{p.name}"
+
+    return bytes(purl_str, "utf-8")
 
 
 def create_purl_map(purls):
-    # Ensure elements of `purls` are strings:
-    purl_strs = []
-    for purl in purls:
-        if not isinstance(purl, (PackageURL, str)):
-            raise ValueError(f"invalid purl in `purls`: {purl}")
-        if isinstance(purl, PackageURL):
-            purl_str = purl.to_string()
-        else:
-            purl_str = purl
-        purl_strs.append(purl_str)
+    # Ensure elements of `purls` are PackageURLs:
+    purls = [check_purl(purl) for purl in purls]
 
-    # purl strs must be sorted and converted to bytes before going into the Map
-    prepared_purl_strs = [(bytes(purl_str, "utf-8"), 1) for purl_str in sorted(purl_strs)]
+    # purl map entries must be unique, sorted, and converted to bytes before going into the Map
+    purl_map_entries = set(create_purl_map_entry(purl) for purl in purls)
+    prepared_purl_map_entries = sorted((purl_map_entry, 1) for purl_map_entry in purl_map_entries)
 
     # create map
     temp_dir = fileutils.get_temp_dir()
     map_loc = Path(temp_dir) / "purls.map"
-    ducer.Map.build(map_loc, prepared_purl_strs)
+    ducer.Map.build(map_loc, prepared_purl_map_entries)
 
     return map_loc
 
 
 class PurlValidator:
-    def __init__(self, purl_map_loc=None):
+    def __init__(self, purls=None):
         self.created_maps = []
 
-        if purl_map_loc:
-            if not isinstance(purl_map_loc, (Path, str)):
-                raise ValueError("`purl_map_loc` must be a Path or path string")
-            if not isinstance(purl_map_loc, Path):
-                # Ensure purl_map_loc is a Path
-                purl_map_loc = Path(purl_map_loc)
+        if purls:
+            # Create purl map from list of purls
+            purl_map_loc = self.create_purl_map(purls=purls)
         else:
-            # Create purl map from PURLS
-            purl_map_loc = self.create_purl_map(purls=PURLS)
+            purl_map_loc = PURL_MAP_LOCATION
 
         self.purl_map = self.load_purl_map(location=purl_map_loc)
 
@@ -82,30 +91,14 @@ class PurlValidator:
         self.created_maps.append(purl_map_loc)
         return purl_map_loc
 
-    def load_purl_map(self, location):
+    @classmethod
+    def load_purl_map(cls, location):
         with open(location, "rb") as f:
             mm = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
         m = ducer.Map(mm)
         return m
 
     def validate_purl(self, purl):
-        if not isinstance(purl, (PackageURL, str)):
-            raise ValueError("`purl` must be a PackageURL or purl string")
-
-        # Ensure `purl` is a PackageURL
-        if isinstance(purl, str):
-            purl = PackageURL.from_string(purl)
-
-        # Convert purl to bytes
-        purl_bytes = bytes(purl.to_string(), "utf-8")
-
-        return bool(self.purl_map.get(purl_bytes))
-
-
-if __name__ == "__main__":
-    purl_validator = PurlValidator()
-    print(
-        purl_validator.validate_purl(
-            "pkg:maven/be.sweetmustard.vinegar/vinegar-pattern-matcher@0.1.1"
-        )
-    )
+        purl_map_entry = create_purl_map_entry(purl)
+        in_purl_map = bool(self.purl_map.get(purl_map_entry))
+        return in_purl_map
