@@ -29,7 +29,7 @@ import ducer
 PURL_MAP_LOCATION = Path(__file__).parent / "purls.map"
 
 
-def check_purl(purl):
+def create_purl_map_entry(purl):
     if not isinstance(purl, (PackageURL, str)):
         raise ValueError(f"invalid `purl`: {purl}")
 
@@ -39,25 +39,17 @@ def check_purl(purl):
     else:
         p = purl
 
-    return p
-
-
-def create_purl_map_entry(purl):
-    p = check_purl(purl)
-
-    # Convert purl to bytes
+    # Create purl map entry string
     if p.namespace:
         purl_str = f"{p.type}/{p.namespace}/{p.name}"
     else:
         purl_str = f"{p.type}/{p.name}"
 
+    # Convert purl map entry string to bytes
     return bytes(purl_str, "utf-8")
 
 
 def create_purl_map(purls):
-    # Ensure elements of `purls` are PackageURLs:
-    purls = (check_purl(purl) for purl in purls)
-
     # purl map entries must be unique, sorted, and converted to bytes before going into the Map
     purl_map_entries = set(create_purl_map_entry(purl) for purl in purls)
     prepared_purl_map_entries = sorted((purl_map_entry, 1) for purl_map_entry in purl_map_entries)
