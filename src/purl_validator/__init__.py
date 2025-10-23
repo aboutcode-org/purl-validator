@@ -30,6 +30,11 @@ PURL_MAP_LOCATION = Path(__file__).parent / "purls.map"
 
 
 def create_purl_map_entry(purl):
+    """
+    Given a `purl` that is a PackageURL proper or a string representation of
+    one, return a bytestring containing the type, namespace (if available), and
+    name of the package from `purl`.
+    """
     if not isinstance(purl, (PackageURL, str)):
         raise ValueError(f"invalid `purl`: {purl}")
 
@@ -50,6 +55,12 @@ def create_purl_map_entry(purl):
 
 
 def create_purl_map(purls):
+    """
+    Given an iterable of `purls`, that can be either PackageURLs proper or
+    strings representing them, return a Ducer map that contains strings created
+    from the type, namespace (if available), and name of the packages from
+    `purls`.
+    """
     # purl map entries must be unique, sorted, and converted to bytes before going into the Map
     purl_map_entries = set(create_purl_map_entry(purl) for purl in purls)
     prepared_purl_map_entries = sorted((purl_map_entry, 1) for purl_map_entry in purl_map_entries)
@@ -74,6 +85,10 @@ class PurlValidator:
         return m
 
     def validate_purl(self, purl):
+        """
+        Given a `purl` that is a PackageURL proper or a string representation of
+        one, return True if `purl` exists, False otherwise.
+        """
         purl_map_entry = create_purl_map_entry(purl)
         in_purl_map = bool(self.purl_map.get(purl_map_entry))
         return in_purl_map
