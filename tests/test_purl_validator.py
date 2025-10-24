@@ -40,8 +40,8 @@ class TestPurlValidator(FileBasedTesting):
         test_purl3 = "not-a-purl"
         test_purl4 = []
 
-        self.assertEqual(b'npm/@test/test', purl_validator.create_purl_map_entry(test_purl1))
-        self.assertEqual(b'npm/test2', purl_validator.create_purl_map_entry(test_purl2))
+        self.assertEqual(b"npm/@test/test", purl_validator.create_purl_map_entry(test_purl1))
+        self.assertEqual(b"npm/test2", purl_validator.create_purl_map_entry(test_purl2))
 
         with self.assertRaises(ValueError):
             purl_validator.create_purl_map_entry(test_purl3)
@@ -60,7 +60,7 @@ class TestPurlValidator(FileBasedTesting):
         self.created_purl_maps.append(purl_map_loc)
 
         purl_map = purl_validator.PurlValidator.load_map(purl_map_loc)
-        expected_results = [(b'npm/@test/test', 1), (b'npm/test2', 1)]
+        expected_results = [(b"npm/@test/test", 1), (b"npm/test2", 1)]
         results = [(k, v) for k, v in purl_map.items()]
         self.assertEqual(expected_results, results)
 
