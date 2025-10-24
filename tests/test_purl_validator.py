@@ -34,6 +34,11 @@ class TestPurlValidator(FileBasedTesting):
             fileutils.delete(purl_map.parent)
         return super().tearDown()
 
+    def create_purl_map(self, purls):
+        purl_map_loc = purl_validator.create_purl_map(purls)
+        self.created_purl_maps.append(purl_map_loc)
+        return purl_map_loc
+
     def test_purl_validator_create_purl_map_entry(self):
         test_purl1 = PackageURL(type="npm", namespace="@test", name="test", version="1.0")
         test_purl2 = "pkg:npm/test2@2.0"
@@ -56,16 +61,14 @@ class TestPurlValidator(FileBasedTesting):
         test_purl4 = []
         purls = [test_purl1, test_purl2]
 
-        purl_map_loc = purl_validator.create_purl_map(purls)
-        self.created_purl_maps.append(purl_map_loc)
-
+        purl_map_loc = self.create_purl_map(purls)
         purl_map = purl_validator.PurlValidator.load_map(purl_map_loc)
         expected_results = [(b"npm/@test/test", 1), (b"npm/test2", 1)]
         results = [(k, v) for k, v in purl_map.items()]
         self.assertEqual(expected_results, results)
 
         with self.assertRaises(ValueError):
-            purl_validator.create_purl_map([test_purl3])
+            self.create_purl_map([test_purl3])
 
         with self.assertRaises(ValueError):
-            purl_validator.create_purl_map([test_purl4])
+            self.create_purl_map([test_purl4])
