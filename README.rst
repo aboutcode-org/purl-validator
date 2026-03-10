@@ -1,15 +1,94 @@
-purl-validator
-================================
+# purl-validator
 
-PURLs are everywhere in SBOMs. But with adoption comes widespread errors.
-A recent study on the quality of SBOMs revealed that for many proprietary and
-open source tools, PURLs in SBOMs are inconsistent, fake, incorrect, or
-misleading. This is a serious problem to any application of SBOMs for
-cybersecurity and application security, as well as related compliance
-regulations. This project is to create a PURL validator that's decentralized
-such that libraries can use it offline and help them create better PURLs.
+[![License](https://img.shields.io/badge/License-Apache--2.0-blue.svg?style=for-the-badge)](https://opensource.org/licenses/Apache-2.0)
+[![Version](https://img.shields.io/github/v/release/aboutcode-org/purl-validator?style=for-the-badge)](https://github.com/aboutcode-org/purl-validator/releases)
+[![Test](https://img.shields.io/github/actions/workflow/status/aboutcode-org/purl-validator/ci.yml?style=for-the-badge&logo=github)](https://github.com/aboutcode-org/purl-validator/actions)
 
-Building this compact dataset is new territory. There is research
-and exploration necessary for creating a super compact data structure
-that is also easy and fast to query across multiple languages. The data
-structure will also need memory-mapping to avoid running out of memory.
+**purl-validator** is a Rust library for validating [Package URLs (PURLs)](https://github.com/package-url/purl-spec). It works fully offline, including in **air-gapped** or **restricted environments**, and answers one key question: **Does the package this PURL represents actually exist?**
+
+## How It Works?
+
+**purl-validator** is shipped with a pre-built FST (Finite State Transducer), a set of compact automata containing latest Package URLs mined by the MineCode[^1]. Library uses this FST to perform lookups and confirm whether the **base PURL**[^2] exists.
+
+## Currently Supported Ecosystems
+
+- **apk**
+- **cargo**
+- **composer**
+- **conan**
+- **cpan**
+- **cran**
+- **debain**
+- **maven**
+- **npm**
+- **nuget**
+- **pypi**
+- **swift**
+
+## Usage
+
+Add `purl-validator` to your Python dependencies
+
+```bash
+pypi install purl-validator
+```
+
+Use it in your code like this:
+
+```python
+
+from purl_validator import PurlValidator
+
+validator = PurlValidator()
+
+PurlValidator.validate_purl("pkg:nuget/FluentValidation")
+>>> True
+
+PurlValidator.validate_purl("pkg:nuget/non-existent-foo-bar")
+>>> False
+```
+
+## Contribution
+
+We welcome contributions from the community! If you find a bug or have an idea for a new feature, please open an issue on the GitHub repository. If you want to contribute code, you can fork the repository, make your changes, and submit a pull request.
+
+* Please try to write a good commit message, see [good commit message wiki](https://aboutcode.readthedocs.io/en/latest/contributing/writing_good_commit_messages.html).
+* Add DCO `Sign Off` to your commits.
+
+## Development Setup
+
+Run these commands, starting from a git clone of [https://github.com/aboutcode-org/purl-validator.git](https://github.com/aboutcode-org/purl-validator.git)
+
+Run tests:
+
+```bash
+make test
+```
+
+Fix formatting and linting:
+
+```bash
+make valid
+```
+
+## License
+
+SPDX-License-Identifier: Apache-2.0
+
+purl-validator is licensed under Apache License version 2.0.
+
+```text
+You may not use this software except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+```
+
+[^1]: MineCode continuously collects package metadata from various package ecosystems to maintain an up-to-date catalog of known packages.
+[^2]: A Base Package URL is a Package URL without a version, qualifiers or subpath.
