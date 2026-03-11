@@ -4,9 +4,9 @@
 [![Version](https://img.shields.io/github/v/release/aboutcode-org/purl-validator?style=for-the-badge)](https://github.com/aboutcode-org/purl-validator/releases)
 [![Test](https://img.shields.io/github/actions/workflow/status/aboutcode-org/purl-validator/ci.yml?style=for-the-badge&logo=github)](https://github.com/aboutcode-org/purl-validator/actions)
 
-**purl-validator** is a Rust library for validating [Package URLs (PURLs)](https://github.com/package-url/purl-spec). It works fully offline, including in **air-gapped** or **restricted environments**, and answers one key question: **Does the package this PURL represents actually exist?**
+**purl-validator** is a Python library for validating [Package URLs (PURLs)](https://github.com/package-url/purl-spec). It works fully offline, including in **air-gapped** or **restricted environments**, and answers one key question: **Does the package this PURL represents actually exist?**
 
-## How It Works?
+## How Does It Work?
 
 **purl-validator** is shipped with a pre-built FST (Finite State Transducer), a set of compact automata containing latest Package URLs mined by the MineCode[^1]. Library uses this FST to perform lookups and confirm whether the **base PURL**[^2] exists.
 
