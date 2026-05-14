@@ -18,7 +18,7 @@
 - **conan**
 - **cpan**
 - **cran**
-- **debain**
+- **debian**
 - **maven**
 - **npm**
 - **nuget**
