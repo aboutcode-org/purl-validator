@@ -4,7 +4,9 @@
 [![Version](https://img.shields.io/github/v/release/aboutcode-org/purl-validator?style=for-the-badge)](https://github.com/aboutcode-org/purl-validator/releases)
 [![Test](https://img.shields.io/github/actions/workflow/status/aboutcode-org/purl-validator/ci.yml?style=for-the-badge&logo=github)](https://github.com/aboutcode-org/purl-validator/actions)
 
-**purl-validator** is a Python library for validating [Package URLs (PURLs)](https://github.com/package-url/purl-spec). It works fully offline, including in **air-gapped** or **restricted environments**, and answers one key question: **Does the package this PURL represents actually exist?**
+**purl-validator** is a Python library for validating [Package URLs (PURLs)](https://github.com/package-url/purl-spec). 
+It works fully offline, including in **air-gapped** or **restricted environments**, 
+and answers one key question: **Does the package this PURL represents actually exist?**
 
 ## How Does It Work?
 
@@ -12,18 +14,18 @@
 
 ## Currently Supported Ecosystems
 
-- **apk**
-- **cargo**
-- **composer**
-- **conan**
-- **cpan**
-- **cran**
-- **debian**
-- **maven**
-- **npm**
-- **nuget**
-- **pypi**
-- **swift**
+- apk
+- cargo
+- composer
+- conan
+- cpan
+- cran
+- debian
+- maven
+- npm
+- nuget
+- pypi
+- swift
 
 ## Usage
 
@@ -47,6 +49,46 @@ PurlValidator.validate_purl("pkg:nuget/FluentValidation")
 PurlValidator.validate_purl("pkg:nuget/non-existent-foo-bar")
 >>> False
 ```
+The validator accepts a PURL string or a `packageurl.PackageURL` object:
+
+```python
+from packageurl import PackageURL
+from purl_validator import PurlValidator
+
+validator = PurlValidator()
+purl = PackageURL(type="npm", namespace="@angular", name="core")
+
+exists = validator.validate_purl(purl)
+print(exists)
+```
+
+Only the base PURL is used for queries (e.g., oonly package type/namespace/name.)
+Version, qualifiers, and subpath are not part of the query:
+
+```python
+from purl_validator import create_purl_map_entry
+
+assert create_purl_map_entry("pkg:pypi/django@5.0.0") == b"pypi/django"
+```
+
+You can also build and load a custom index for tests or experiments:
+
+```python
+from purl_validator import PurlValidator
+from purl_validator import create_purl_map
+
+purl_map_location = create_purl_map([
+    "pkg:pypi/django",
+    "pkg:npm/%40angular/core",
+])
+
+validator = PurlValidator(purl_map_location)
+assert validator.validate_purl("pkg:pypi/django") is True
+assert validator.validate_purl("pkg:pypi/not-a-real-package-name") is False
+```
+
+Use one `PurlValidator` instance for many lookups. Creating the instance loads
+the packaged map, while each validation is an exact membership check.
 
 ## Contribution
 
@@ -91,4 +133,4 @@ limitations under the License.
 ```
 
 [^1]: MineCode continuously collects package metadata from various package ecosystems to maintain an up-to-date catalog of known packages.
-[^2]: A Base Package URL is a Package URL without a version, qualifiers or subpath.
+[^2]: A Base Package URL is a Package URL without a version, qualifiers, or subpath.
