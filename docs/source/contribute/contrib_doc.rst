@@ -187,7 +187,7 @@ Style Conventions for the Documentaion
 
     (`Refer <https://www.sphinx-doc.org/en/master/usage/restructuredtext/basics.html#sections>`_)
     Normally, there are no heading levels assigned to certain characters as the structure is
-    determined from the succession of headings. However, this convention is used in Python’s Style
+    determined from the succession of headings. However, this convention is used in Python's Style
     Guide for documenting which you may follow:
 
     # with overline, for parts
