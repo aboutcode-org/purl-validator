@@ -163,74 +163,115 @@ The final selected FST libraries are:
 Appendix: Benchmarks
 --------------------
 
-This directory contains evaluation and benchmark files for
-PurlValidator.
+This directory contains the benchmark Python scripts and mini benchmark
+projects used for PurlValidator evaluation in Go and Rust.
 
-It compares structures for offline PURL membership checks with these
-implementations use:
+The benchmarks compare offline PURL existence checks using:
 
--  Python: memory-mapped ``ducer``.
--  Rust: crate ``fst``.
--  Go: embedded Vellum FST.
+- Python: memory-mapped ``ducer``.
+- Rust: crate ``fst``.
+- Go: embedded Vellum FST.
+- Python built-in ``set`` and ``dict``,
+- Python sorted list,
+- Python embedded SQLite,
+- and a Rust DAWG.
 
-… as well as the builtin Python set and dict, SQLite and a Rust DAWG
 
 Expected checkout layout
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-Run the scripts from a directory with these repositories checkouts:
+We assume you have Python, Go and Rust pre-installed:
+``python``, Rust ``cargo`` and Go ``go`` must be on the ``PATH``.
 
--  ``/purl-validator``
--  ``/purl-validator.rs``
--  ``/purlvalidator-go``
 
-benchmarking FST vs. DAWG
+First clone the three repos, in the same ``workspace`` directory:
+
+- ``git clone https://github.com/aboutcode-org/purl-validator``
+- ``git clone https://github.com/aboutcode-org/purl-validator.rs``
+- ``git clone https://github.com/aboutcode-org/purlvalidator-go``
+
+The scripts derive the workspace path from this ``purl-validator`` clone.
+Use ``--workspace`` only when the three clones are not in the same parent
+directory.
+
+Install the Python dependencies from the Python repo:
+
+.. code:: sh
+
+   cd purl-validator
+   python3 -m venv venv
+   . venv/bin/activate
+   python -m pip install -U pip
+   python -m pip install -r requirements.txt packageurl-python
+
+
+The Rust and Go lookup test project code is checked in under:
+
+-  ``etc/bench/rust-lookup-bench``
+-  ``etc/bench/go-lookup-bench``
+
+The Python benchmark driver builds and runs those projects.
+
+
+
+Benchmarking FST vs. DAWG
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-There is a good benchmarch in Go comparing FST and DAWG data structures
-(and other structures) that highlights why an FST is a better structure
-for our cases than a DAWG:
+Note: there is a Go benchmark comparing FST and DAWG data structures, plus
+other structures:
 
 https://github.com/timurgarif/go-fsa-trie-bench
 
-We also did a simple synthetic benchmark of the Rust fst and dawg crates
-using actual base PURLs using the data in
-https://github.com/aboutcode-org/purl-validator.rs/tree/main/fst_builder/data
+The local Rust benchmark compares the ``fst`` and ``dawg`` crates using
+the base PURLs from ``purl-validator.rs/fst_builder/data``.
 
-The ``etc/bench/rust-fst-dawg-bench`` code compare these fst and dawg
-crates.
+Run it from the purl-validator/ dir (with activated venv):
+
+.. code:: sh
+
+   cargo build --release --manifest-path etc/bench/rust-fst-dawg-bench/Cargo.toml
+   etc/bench/rust-fst-dawg-bench/target/release/rust-fst-dawg-bench
 
 The dataset profile has 2,324,119 unique sorted base PURL. The benchmark
 is to run 1M queries, where 500K are expected to fail.
 
--  The fst crate index was built in 11s, with a 26MB serialized file,
+-  The fst crate index was built in 11s, with a 25MB serialized file,
    and took 0.703s for 1M lookups.
--  The dawg crate index was built in 18s, with a 831MB serialized file,
+-  The dawg crate index was built in 18s, with a 794MB serialized file,
    and took 28s for 1M lookups.
 
 The outcome is that the preferred structure is an FST over a DAWG (at
 least with these implementations).
 
-benchmarking FST against builtin and SQLite
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Since we picked the FST as the winner, additional review has been
-focused on Python by comparing the ducer fst library against other
-approaches. Since it is based on the Rust fst and Go’s vellum is also
-based on the fst design, we cover essentially the three languages at
-once.
+Benchmarking FST against built-ins and SQLite
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The ``etc/scripts/bench/alternative_benchmark.py`` script compares
-Python lookup using a text file with one PURL per line for these
-candidates:
+Additional review compares the Python ``ducer`` FST library against
+other approaches. ``ducer`` uses the Rust ``fst`` crate, and Go Vellum is
+based on the same FST design.
+
+The ``etc/bench/alternative_benchmark.py`` script compares
+Python lookup using a list of PURLs (text file with one PURL per line)
+for these candidates:
 
 -  Python ``set``.
 -  Python ``dict``.
--  Python Sorted list plus ``bisect``.
+-  Python sorted list plus ``bisect``.
 -  In-memory SQLite.
--  FST using a ``ducer.Map``.
+-  FST using a ``ducer.Map`` (a Python wrapper on the Rust fst crate).
 
-Data is from ``purl-validator.rs/fst_builder/data/``
+Data (PURL lists) is from ``purl-validator.rs/fst_builder/data/``
+
+Run it from the purl-validator/ dir (with activated venv):
+
+.. code:: sh
+
+   python etc/bench/alternative_benchmark.py \
+       --input ../purl-validator.rs/fst_builder/data \
+       --limit 0 \
+       --queries 1000000 \
+       --report tmp/alternative-structures.txt
 
 Results with 2,324,119 unique PURLs and 1M lookup queries, 500K existing
 PURLs:
@@ -245,14 +286,31 @@ PURLs:
    sorted list+bisect       0.017540       2.783555        236MB in RAM
    sqlite in memory         4.855480       4.220032        207MB on disk (or 65MB with zstd)
 
-benchmarking FST in Python vs. Go vs. Rust
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-This benchmark runs each of the three validator released
-implementations. The script is in
-``etc/scripts/bench/go-rust-py_benchmark.py``
+Benchmarking FST in Python, Go, and Rust
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Data is from ``purl-validator.rs/fst_builder/data/``
+This benchmark runs three PURL validators implementations.
+The script is ``etc/bench/go-rust-py_benchmark.py``.
+
+The benchmark goes through these steps:
+
+-  loads PURL lists from ``purl-validator.rs/fst_builder/data``.
+-  builds the Python ``ducer`` map (i.e., a Rust FST using the ``fst`` crate).
+-  builds the Rust FST with ``purl-validator.rs``.
+-  builds the Go FST with ``purlvalidator-go``.
+-  runs 1M lookups, with 500K known PURLs and 500K unknown PURLs.
+
+
+Run it from the purl-validator/ dir (with activated venv):
+
+.. code:: sh
+
+   python etc/bench/go-rust-py_benchmark.py \
+       --queries 1000000 \
+       --report tmp/go-rust-py-results.txt
+
+PURL data is from ``purl-validator.rs/fst_builder/data/``
 
 Results with 2,324,119 unique PURLs and 1M lookup queries, 500K existing
 PURLs:
@@ -265,20 +323,16 @@ PURLs:
    Rust purl-validator.rs   11.849877      0.348128         25MB
    Go purlvalidator-go       2.325181      0.704749         25MB
 
-Evaluation
-~~~~~~~~~~
 
-The results are consistent with expectations: Rust is faster than Go and
-Python.
+Evaluation and final solution
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-And the Python on disk fst is the same size as the Rust fst (since this
-is the same backing code).
+The Rust implementation has the fastest lookup in this run. The Python
+on-disk FST is about the same size as the Rust FST because both use the
+same backing FST implementation.
 
-Some surprises:
+The Go index build is faster in this run. That may be worth checking
+against the Rust FST builder.
 
--  The build of the Go index is the fastest which is surprising and
-   could be an avenue of improvement for the Rust fst crate.
-
--  Leaving aside the 10x larger RAM need, the Python set and dict are
-   competitive speed wise (faster than the on-disk Rust FST) ans super
-   fast to build too.
+The Python ``set`` and ``dict`` are fast baselines, but they use much
+more RAM than the on-disk FST.

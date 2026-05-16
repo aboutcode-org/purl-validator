@@ -4,16 +4,13 @@ use std::io::{BufRead, BufReader, BufWriter};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-
 use dawg::Dawg;
-use fst::raw::Fst;
 use fst::SetBuilder;
+use fst::raw::Fst;
 
 // Simple benchmark to compare PURL lookup using a DAWG or an FST
 
 const N_LOOKUPS: usize = 1_000_000;
-const OUT_DIR: &str = "target/purl-bench";
-const PURL_DATA_DIR: &str = "purl-validator.rs/fst_builder/data";
 
 struct BenchResult {
     name: &'static str,
@@ -23,7 +20,7 @@ struct BenchResult {
     hits: usize,
 }
 
-/// Collect all PURL files (each with one PURL per lien)
+/// Collect all PURL files, one PURL per line.
 fn purl_files(path: &Path) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> {
     let mut files = fs::read_dir(path)?
         .map(|entry| entry.map(|entry| entry.path()))
@@ -49,6 +46,7 @@ fn load_purls(path: &Path) -> Result<(Vec<String>, usize), Box<dyn std::error::E
         }
     }
     keys.sort();
+    keys.dedup();
     Ok((keys, raw_count))
 }
 
@@ -64,8 +62,12 @@ fn build_queries(keys: &[String]) -> Vec<String> {
 }
 
 /// Bench for the fst crate
-fn bench_fst(keys: &[String], queries: &[String]) -> Result<BenchResult, Box<dyn std::error::Error>> {
-    let path = Path::new(OUT_DIR).join("real-purls.fst");
+fn bench_fst(
+    keys: &[String],
+    queries: &[String],
+    out_dir: &Path,
+) -> Result<BenchResult, Box<dyn std::error::Error>> {
+    let path = out_dir.join("real-purls.fst");
 
     let build_start = Instant::now();
     {
@@ -101,8 +103,9 @@ fn bench_fst(keys: &[String], queries: &[String]) -> Result<BenchResult, Box<dyn
 fn bench_dawg_crate(
     keys: &[String],
     queries: &[String],
+    out_dir: &Path,
 ) -> Result<BenchResult, Box<dyn std::error::Error>> {
-    let path = Path::new(OUT_DIR).join("real-purls.dawg-bincode");
+    let path = out_dir.join("real-purls.dawg-bincode");
 
     let build_start = Instant::now();
     let mut dawg = Dawg::new();
@@ -137,35 +140,97 @@ fn bench_dawg_crate(
 
 fn print_measurement(measurement: &BenchResult) {
     println!(
-        "| {} | {:.3} | {} | {:.3} | {} |",
+        "{:<20}   {:>12.6}   {:>14.6}   {:<27}",
         measurement.name,
         measurement.build_time.as_secs_f64(),
-        measurement.disk_bytes,
         measurement.lookup_time.as_secs_f64(),
-        measurement.hits,
+        storage_size(measurement.disk_bytes),
     );
 }
 
+fn storage_size(bytes: u64) -> String {
+    let mib = (bytes as f64 / 1024.0 / 1024.0).round() as u64;
+    format!("{mib}MB")
+}
+
+fn default_data_dir() -> PathBuf {
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    manifest_dir
+        .ancestors()
+        .nth(4)
+        .expect("cannot find workspace directory")
+        .join("purl-validator.rs/fst_builder/data")
+}
+
+fn default_out_dir() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target/purl-bench")
+}
+
+fn parse_args() -> Result<(PathBuf, PathBuf), Box<dyn std::error::Error>> {
+    let mut data_dir = default_data_dir();
+    let mut out_dir = default_out_dir();
+    let mut args = std::env::args().skip(1);
+
+    while let Some(arg) = args.next() {
+        match arg.as_str() {
+            "--data-dir" => {
+                data_dir = PathBuf::from(args.next().ok_or("--data-dir requires a value")?);
+            }
+            "--out-dir" => {
+                out_dir = PathBuf::from(args.next().ok_or("--out-dir requires a value")?);
+            }
+            "--help" | "-h" => {
+                println!("usage: rust-fst-dawg-bench [--data-dir PATH] [--out-dir PATH]");
+                std::process::exit(0);
+            }
+            _ => return Err(format!("unknown argument: {arg}").into()),
+        }
+    }
+
+    Ok((data_dir, out_dir))
+}
+
+fn check_hits(measurement: &BenchResult) -> Result<(), Box<dyn std::error::Error>> {
+    let expected_hits = N_LOOKUPS / 2;
+    if measurement.hits != expected_hits {
+        return Err(format!(
+            "{} returned {} hits; expected {}",
+            measurement.name, measurement.hits, expected_hits
+        )
+        .into());
+    }
+    Ok(())
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    fs::create_dir_all(OUT_DIR)?;
+    let (data_dir, out_dir) = parse_args()?;
+    fs::create_dir_all(&out_dir)?;
 
-    println!("Loading PURLs from {PURL_DATA_DIR}");
     let load_start = Instant::now();
-    let (keys, raw_count) = load_purls(Path::new(PURL_DATA_DIR))?;
-    let load_time = load_start.elapsed();
+    let (keys, _raw_count) = load_purls(&data_dir)?;
+    if keys.is_empty() {
+        return Err(format!("no PURLs in {}", data_dir.display()).into());
+    }
+    let _load_time = load_start.elapsed();
     let queries = build_queries(&keys);
-    println!("Unique sorted keys: {}", keys.len());
-    println!("Input load/sort seconds: {:.3}", load_time.as_secs_f64());
-    println!("Lookup queries: {N_LOOKUPS}");
-    println!("Expected hits: {}", N_LOOKUPS / 2);
-    println!();
-    println!("| structure | build seconds | disk bytes | lookup seconds | hits |");
-    println!("| --- | ---: | ---: | ---: | ---: |");
+    println!(
+        "{:<20}   {:>12}   {:>14}   {:<27}",
+        "structure", "build (secs)", "lookup (secs)", "storage size"
+    );
+    println!(
+        "{:<20}   {:>12}   {:>14}   {:<27}",
+        "-".repeat(20),
+        "-".repeat(12),
+        "-".repeat(14),
+        "-".repeat(27)
+    );
 
-    let fst = bench_fst(&keys, &queries)?;
+    let fst = bench_fst(&keys, &queries, &out_dir)?;
+    check_hits(&fst)?;
     print_measurement(&fst);
 
-    let dawg = bench_dawg_crate(&keys, &queries)?;
+    let dawg = bench_dawg_crate(&keys, &queries, &out_dir)?;
+    check_hits(&dawg)?;
     print_measurement(&dawg);
 
     Ok(())
